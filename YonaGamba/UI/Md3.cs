@@ -117,12 +117,13 @@ public static class Md3
     /// is actually drawn, not on the font's line box, so glyphs that hug the baseline or lean
     /// to one side (minimize, pointer, lock) line up with their neighbours.
     /// </summary>
-    private static Vector2 InkCenter(string str)
+    private static unsafe Vector2 InkCenter(string str)
     {
         var font = ImGui.GetFont();
         var glyph = font.FindGlyph(str[0]);
+        if (glyph == null) return ImGui.CalcTextSize(str) / 2;
         var scale = font.FontSize > 0 ? ImGui.GetFontSize() / font.FontSize : 1f;
-        var ink = new Vector2(glyph.X0 + glyph.X1, glyph.Y0 + glyph.Y1) / 2 * scale;
+        var ink = new Vector2(glyph->X0 + glyph->X1, glyph->Y0 + glyph->Y1) / 2 * scale;
         return ink.X > 0 && ink.Y > 0 ? ink : ImGui.CalcTextSize(str) / 2;
     }
 
