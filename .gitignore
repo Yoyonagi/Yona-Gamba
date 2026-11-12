@@ -1,0 +1,8 @@
+.vs/
+.idea/
+.vscode/
+obj/
+bin/
+*.user
+dev-build/
+latest.zip

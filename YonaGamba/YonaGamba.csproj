@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <!-- CI overrides this with the tag version (v1.2.3 -> 1.2.3) -->
+    <Version>0.1.0.0</Version>
+
+    <!-- Manifest fields picked up by DalamudPackager -->
+    <Author>Yoyonagi</Author>
+    <Name>Yona Gamba</Name>
+    <Punchline>Blackjack and Higher or Lower with play chips, for the queue.</Punchline>
+    <Description>Yona Gamba is a pair of card games to pass the time: Blackjack and Higher or Lower. They use play chips only: no gil, and nothing is sent to the game or to other players.
+Open it with /ygamba.</Description>
+    <RepoUrl>https://github.com/Yoyonagi/Yona-Gamba</RepoUrl>
+    <IconUrl>https://raw.githubusercontent.com/Yoyonagi/Yona-Gamba/main/images/icon.png</IconUrl>
+    <Tags>minigame;cards;blackjack;fun</Tags>
+
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+</Project>

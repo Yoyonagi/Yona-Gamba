@@ -1,0 +1,94 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PLUGIN: YonaGamba
+  PLUGIN_REPO: Yoyonagi/Yona-XIV-Repo
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download Dalamud
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://goatcorp.github.io/dalamud-distrib/latest.zip -OutFile latest.zip
+          Expand-Archive -Force latest.zip "$env:AppData\XIVLauncher\addon\Hooks\dev"
+
+      - name: Work out version
+        id: version
+        shell: pwsh
+        run: |
+          $prerelease = 'false'
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            # v1.2.3 -> 1.2.3 (stable), v1.2.3.4-beta -> 1.2.3.4 (testing)
+            if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+(\.\d+)?)(-.+)?$') {
+              throw "Tag '$env:GITHUB_REF_NAME' must look like v1.2.3, v1.2.3.4 or v1.2.3-beta"
+            }
+            $version = $Matches[1]
+            if ($Matches[3]) { $prerelease = 'true' }
+          } else {
+            # Dev builds: keep the csproj version, but stamp the run number as the revision.
+            [xml]$proj = Get-Content "$env:PLUGIN/$env:PLUGIN.csproj"
+            $base = ([string]$proj.Project.PropertyGroup.Version).Trim().Split('.')[0..2] -join '.'
+            $version = "$base.$env:GITHUB_RUN_NUMBER"
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+          Write-Host "Building $env:PLUGIN $version (prerelease: $prerelease)"
+
+      - name: Build
+        run: dotnet build --configuration Release -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Unpack dev build
+        shell: pwsh
+        run: Expand-Archive -Force "$env:PLUGIN/bin/x64/Release/$env:PLUGIN/latest.zip" dev-build
+
+      # Download this from the run's summary page, extract it anywhere, and add that
+      # folder under /xlsettings -> Experimental -> Dev Plugin Locations.
+      - name: Upload dev build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN }}-dev-${{ steps.version.outputs.version }}
+          path: dev-build/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: |
+            ${{ env.PLUGIN }}/bin/x64/Release/${{ env.PLUGIN }}/latest.zip
+            ${{ env.PLUGIN }}/bin/x64/Release/${{ env.PLUGIN }}/${{ env.PLUGIN }}.json
+
+      # Tells Yona XIV Repo to rebuild repo.json right away. Optional: without the secret,
+      # the repo picks up the release on its next scheduled run.
+      - name: Notify Yona XIV Repo
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.REPO_DISPATCH_TOKEN }}
+        run: |
+          if (-not $env:GH_TOKEN) {
+            Write-Host "::notice::REPO_DISPATCH_TOKEN is not set; Yona XIV Repo will update on its schedule."
+            exit 0
+          }
+          gh api "repos/$env:PLUGIN_REPO/dispatches" -f event_type=plugin-released -f "client_payload[plugin]=$env:PLUGIN"
